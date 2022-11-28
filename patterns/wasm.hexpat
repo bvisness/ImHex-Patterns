@@ -1,11 +1,15 @@
 #pragma MIME application/wasm
 #pragma endian little
+#pragma eval_depth 128
+#pragma pattern_limit 1000000
 
 #include <std/core.pat>
 #include <std/io.pat>
 #include <std/mem.pat>
 #include <std/string.pat>
 #include <type/leb128.pat>
+
+bool disassembleCode in;
 
 enum SectionID : u8 {
 	Custom = 0,
@@ -20,7 +24,7 @@ enum SectionID : u8 {
 	Element,
 	Code,
 	Data,
-	DataCount
+	DataCount,
 };
 
 //
@@ -480,8 +484,6 @@ fn format_Instruction(Instruction i) {
 };
 
 struct Expression {
-	// TODO: Rich instructions
-	// also this prevents things from decoding correctly at all
 	Instruction instructions[while(std::mem::read_unsigned($, 1) != 0x0B)];
 	padding[1]; // 0x0B (end)
 };
@@ -588,8 +590,7 @@ enum ElementKind : u8 {
 struct Element {
 	type::LEB128 flags;
 	
-	// This stuff is super wack. I have broken it down for myself
-	// this way:
+	// This stuff is super wack. I have broken it down for myself this way:
 	//
 	// bit 0: 0 = passive/declarative (see bit 1). 1 = active.
 	// bit 1: 0 = active uses table 0, or choose passive. 1 = active requires table index, or choose declarative.
@@ -638,6 +639,11 @@ struct Locals {
 
 struct CodeEntry {
 	type::LEB128 size;
+	u8 contents[size];
+};
+
+struct DetailedCodeEntry {
+	type::LEB128 size;
 	type::LEB128 numLocals;
 	Locals locals[numLocals];
 	Expression body;
@@ -645,7 +651,11 @@ struct CodeEntry {
 
 struct CodeSection {
 	type::LEB128 size;
-	CodeEntry entries[size];
+	if (disassembleCode) {
+		DetailedCodeEntry entries[size];
+	} else {
+		CodeEntry entries[size];
+	}
 };
 
 struct DataSegment {
@@ -693,8 +703,8 @@ struct Section {
 		ExportSection exportSection;
 	} else if (id == SectionID::Start) {
 		StartSection startSection;
-	} else if (id == SectionID::Element) {
-		ElementSection elementSection;
+	//} else if (id == SectionID::Element) {
+	//	ElementSection elementSection;
 	} else if (id == SectionID::Code) {
 		CodeSection codeSection;
 	} else if (id == SectionID::Data) {
@@ -703,16 +713,48 @@ struct Section {
 		DataCountSection dataCountSection;
 	} else if (id == SectionID::Custom) {
 		Name name;
-		u8 contents[name.size - size];
+		u8 contents[size - name.size];
 	} else {
 		u8 contents[size];
+	}
+} [[format("format_Section")]];
+
+fn format_Section(Section s) {
+	if (s.id == SectionID::Type) {
+		return "type section";
+	} else if (s.id == SectionID::Import) {
+		return "import section";
+	} else if (s.id == SectionID::Function) {
+		return "function section";
+	} else if (s.id == SectionID::Table) {
+		return "table section";
+	} else if (s.id == SectionID::Memory) {
+		return "memory section";
+	} else if (s.id == SectionID::Global) {
+		return "global section";
+	} else if (s.id == SectionID::Export) {
+		return "export section";
+	} else if (s.id == SectionID::Start) {
+		return "start section";
+	} else if (s.id == SectionID::Element) {
+		return "element section";
+	} else if (s.id == SectionID::Code) {
+		return "code section";
+	} else if (s.id == SectionID::Data) {
+		return "data section";
+	} else if (s.id == SectionID::DataCount) {
+		return "data count section";
+	} else if (s.id == SectionID::Custom) {
+		return "custom section";
+	} else {
+		return "unknown section";
 	}
 };
 
 struct Module {
 	char magic[4];
 	u32 version;
-	
+
 	Section sections[while (!std::mem::eof())];
 };
 
