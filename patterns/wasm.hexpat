@@ -1,7 +1,10 @@
 #pragma MIME application/wasm
 #pragma endian little
 
+#include <std/core.pat>
+#include <std/io.pat>
 #include <std/mem.pat>
+#include <std/string.pat>
 #include <type/leb128.pat>
 
 enum SectionID : u8 {
@@ -413,6 +416,67 @@ struct Instruction {
 
 		// Saturating truncation instructions have no additional fields
 	} else {}
+} [[format("format_Instruction")]];
+
+fn dotify(str name, str prefix) {
+	if (std::string::starts_with(name, prefix)) {
+		return std::format("{}.{}", prefix, std::string::substr(name, std::string::length(prefix), 999));
+	}
+};
+
+fn renameInstruction(str name) {
+	// TODO: This crashes.
+	// name = dotify(name, "local_");
+	// TODO: other prefixes, once it doesn't crash
+	return name;
+};
+
+fn format_Instruction(Instruction i) {
+	if (i.opcode == Opcode::vector) {
+		// TODO
+		return std::format("vector instruction {}", i.vectorOpcode);
+	}
+	if (i.opcode == Opcode::other_stuff) {
+		// TODO
+		return std::format("misc instruction {}", i.miscOpcode);
+	}
+
+	str name = renameInstruction(std::string::substr(
+		std::core::formatted_value(i.opcode),
+		8, 999
+	));
+	if (i.opcode == Opcode::br || i.opcode == Opcode::br_if) {
+		return std::format("{} {}", name, i.labelIndex);
+	} else if (i.opcode == Opcode::call) {
+		return std::format("{} {}", name, i.funcIndex);
+	} else if (i.opcode == Opcode::call_indirect) {
+		return std::format("{} (type {}, table {})", name, i.funcTypeIndex, i.tableIndex);
+	} else if (i.opcode == Opcode::ref_null) {
+		str reftype = std::string::substr(
+			std::core::formatted_value(i.referenceType),
+			15, 999
+		);
+		return std::format("{} {}", name, reftype);
+	} else if (i.opcode == Opcode::ref_func) {
+		return std::format("{} {}", name, i.funcIndex);
+	} else if (Opcode::local_get <= i.opcode && i.opcode <= Opcode::local_tee) {
+		return std::format("{} {}", name, i.localIndex);
+	} else if (i.opcode == Opcode::global_get || i.opcode == Opcode::global_set) {
+		return std::format("{} {}", name, i.globalIndex);
+	} else if (i.opcode == Opcode::table_get || i.opcode == Opcode::table_set) {
+		return std::format("{} {}", name, i.tableIndex);
+	} else if (Opcode::i32_load <= i.opcode && i.opcode <= Opcode::i64_store32) {
+		return std::format("{} a:{} o:{}", name, i.memArg.align, i.memArg.offset);
+		MemArg memArg;
+	} else if (i.opcode == Opcode::i32_const || i.opcode == Opcode::i64_const) {
+		return std::format("{} {}", name, i.value);
+	} else if (i.opcode == Opcode::f32_const) {
+		return std::format("{} {}", name, i.value);
+	} else if (i.opcode == Opcode::f64_const) {
+		return std::format("{} {}", name, i.value);
+	} else {
+		return name;
+	}
 };
 
 struct Expression {
