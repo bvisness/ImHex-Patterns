@@ -323,9 +323,9 @@ struct Instruction {
 		Instruction trueBlock[while(std::mem::read_unsigned($, 1) != 0x05 && std::mem::read_unsigned($, 1) != 0x0B)];
 		u8 endOrElse; // 0x05 or 0x0B
 		if (endOrElse == 0x05) {
-    		Instruction falseBlock[while(std::mem::read_unsigned($, 1) != 0x0B)];
-    		padding[1]; // 0x0B
-    	}
+			Instruction falseBlock[while(std::mem::read_unsigned($, 1) != 0x0B)];
+			padding[1]; // 0x0B
+		}
 	} else if (opcode == Opcode::br || opcode == Opcode::br_if) {
 		type::LEB128 labelIndex;
 	} else if (opcode == Opcode::br_table) {
@@ -357,6 +357,61 @@ struct Instruction {
 		float value;
 	} else if (opcode == Opcode::f64_const) {
 		double value;
+	} else if (opcode == Opcode::vector) {
+		type::LEB128 vectorOpcode;
+		// TODO: This handles all the vector op fields, but doesn't
+		// have nice names for them.
+
+		if (
+			(0 <= vectorOpcode && vectorOpcode <= 11)
+			|| (84 <= vectorOpcode && vectorOpcode <= 93)
+		) {
+			MemArg memArg;
+		}
+
+		if (
+			(84 <= vectorOpcode && vectorOpcode <= 91)
+			|| (21 <= vectorOpcode && vectorOpcode <= 34)
+		) {
+			u8 laneIndex;
+		}
+
+		if (vectorOpcode == 12) {
+			u8 bytes[16];
+		}
+
+		if (vectorOpcode == 13) {
+			u8 lanes[16];
+		}
+	} else if (opcode == Opcode::other_stuff) {
+		type::LEB128 miscOpcode;
+
+		// Table instructions
+		if (miscOpcode == 12) { // table.init
+			type::LEB128 elementIndex;
+			type::LEB128 tableIndex;
+		} else if (miscOpcode == 13) { // elem.drop
+			type::LEB128 elementIndex;
+		} else if (miscOpcode == 14) { // table.copy
+			type::LEB128 destTable;
+			type::LEB128 srcTable;
+		} else if (15 <= miscOpcode && miscOpcode <= 17) { // table.grow, table.size, table.fill
+			type::LEB128 tableIndex;
+		}
+
+		// Memory instructions
+		if (miscOpcode == 8) { // memory.init
+			type::LEB128 dataIndex;
+			padding[1]; // 0x00, reserved for multi-memory
+		} else if (miscOpcode == 9) { // data.drop
+			type::LEB128 dataIndex;
+		} else if (miscOpcode == 10) { // memory.copy
+			padding[2]; // 0x00 0x00, reserved for multi-memory
+		} else if (miscOpcode == 11) { // memory.fill
+			padding[1]; // 0x00, reserved for multi-memory
+		}
+
+		// Saturating truncation instructions have no additional fields
 	} else {}
 };
 
@@ -598,14 +653,3 @@ struct Module {
 };
 
 Module module @ 0x00;
-//Expression blep @ 0x7F;
-//CodeEntry blep @ 0x7D;
-//CodeSection blep @ 0x7C;
-
-
-
-
-
-
-
-
